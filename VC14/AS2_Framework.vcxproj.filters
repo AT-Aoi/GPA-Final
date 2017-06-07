@@ -5,22 +5,9 @@
     <ClCompile Include="..\Source\main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\Assets\fragment.fs.shader" />
-    <None Include="..\Assets\vertex.vs.shader" />
-    <None Include="..\Assets\bloom.shader" />
-    <None Include="..\Assets\blur.shader" />
-    <None Include="..\Assets\difference of gaussian.shader" />
-    <None Include="..\Assets\fish-eye.shader" />
-    <None Include="..\Assets\grayscale.shader" />
-    <None Include="..\Assets\image abstraction.shader" />
-    <None Include="..\Assets\laplacian.shader" />
-    <None Include="..\Assets\quantization.shader" />
-    <None Include="..\Assets\red-blue stereo.shader" />
-    <None Include="..\Assets\sharpen.shader" />
-    <None Include="..\Assets\sine wave.shader" />
     <None Include="..\Assets\vertex2.shader" />
     <None Include="..\Assets\fragment2.shader" />
-    <None Include="..\Assets\pixelation.shader" />
-    <None Include="..\Assets\magnifier.shader" />
+    <None Include="..\Assets\fragment.shader" />
+    <None Include="..\Assets\vertex.shader" />
   </ItemGroup>
 </Project>

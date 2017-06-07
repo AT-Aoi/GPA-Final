@@ -236,11 +236,9 @@ mat4 view;
 mat4 projection;
 
 GLuint program2;
-GLuint um4offset;
-GLuint offset;
 GLuint um4mouse;
-GLuint um4height;
-GLuint um4comparisonBarX;
+int time;
+GLuint um4time;
 GLuint window_vao;
 GLuint window_buffer;
 GLuint FBO;
@@ -303,14 +301,13 @@ GLuint createProgram(char *fragmentShaderSourcePath) {
 	glAttachShader(newProgram, fragmentShader2);
 	glLinkProgram(newProgram);
 
-	um4offset = glGetUniformLocation(newProgram, "offset");
 	um4mouse = glGetUniformLocation(newProgram, "mouse");
-	um4height = glGetUniformLocation(newProgram, "height");
-	um4comparisonBarX = glGetUniformLocation(newProgram, "comparisonBarX");
+	um4time = glGetUniformLocation(newProgram, "time");
 
-	glUseProgram(newProgram);
-	glUniform1f(um4comparisonBarX, comparisonBarX);
-	glUseProgram(program);
+	// 初始这个 program 的 uniform 参数
+	//glUseProgram(newProgram);
+	//glUniform1f(um4comparisonBarX, comparisonBarX);
+	//glUseProgram(program);
 
 	return newProgram;
 }
@@ -325,8 +322,8 @@ void initShader() {
 	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
 
 	// Load shader file
-	char** vertexShaderSource = loadShaderSource("vertex.vs.shader");
-	char** fragmentShaderSource = loadShaderSource("fragment.fs.shader");
+	char** vertexShaderSource = loadShaderSource("vertex.shader");
+	char** fragmentShaderSource = loadShaderSource("fragment.shader");
 
 	// Assign content of these shader files to those shaders we created before
 	glShaderSource(vertexShader, 1, vertexShaderSource, NULL);
@@ -422,9 +419,9 @@ void My_Display()
 	glUseProgram(program2);
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
-	if (um4offset != -1) {
+	if (um4time != -1) {
 		glUseProgram(program2);
-		glUniform1i(um4offset, offset);
+		glUniform1i(um4time, time);
 		glUseProgram(program);
 	}
 
@@ -476,17 +473,11 @@ void My_Reshape(int width, int height)
 	glBindFramebuffer(GL_FRAMEBUFFER, FBO);
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthRBO);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, FBODataTexture, 0);
-
-	if (um4height != -1) {
-		glUseProgram(program2);
-		glUniform1i(um4height, height);
-		glUseProgram(program);
-	}
 }
 
 void My_Timer(int val)
 {
-	++offset;
+	++time;
 	glutPostRedisplay();
 	glutTimerFunc(timer_speed, My_Timer, val);
 }
@@ -504,31 +495,17 @@ void traceMouse(int x, int y)
 		glUseProgram(program);
 	}
 
-	if (comparisonBarChanging) {
-		comparisonBarX = (float)x / windowWidth;
-		if (um4comparisonBarX != -1) {
-			glUseProgram(program2);
-			glUniform1f(um4comparisonBarX, comparisonBarX);
-			glUseProgram(program);
-		}
-	} else {
-		//mat4 rotation = rotate(mat4(), (float)deg2rad(y - downY), vec3(1, 0, 0)) *
-			//rotate(mat4(), (float)deg2rad(x - downX), vec3(0, 1, 0));
-
-		mat4 rotation = rotate(mat4(), (float)deg2rad(y - downY) * speed, cross(downCameraFront, downCameraUp)) *
-			rotate(mat4(), (float)deg2rad(x - downX) * speed, downCameraUp);
-		cameraFront = mat3(rotation) * downCameraFront;
-		cameraUp = mat3(rotation) * downCameraUp;
-		view = lookAt(cameraPos, cameraFront, cameraUp);
-		//view = rotate(downView, (float)deg2rad(x - downX), vec3(0, 1, 0));
-		//view = rotate(view, (float)deg2rad(y - downY), vec3(1, 0, 0));
-	}
+	mat4 rotation = rotate(mat4(), (float)deg2rad(y - downY) * speed, cross(downCameraFront, downCameraUp)) *
+		rotate(mat4(), (float)deg2rad(x - downX) * speed, downCameraUp);
+	cameraFront = mat3(rotation) * downCameraFront;
+	cameraUp = mat3(rotation) * downCameraUp;
+	view = lookAt(cameraPos, cameraFront, cameraUp);
 
 	glutPostRedisplay();
 }
 
 bool mouseInComparisonBar(int x, int y) {
-	if (!comparisonBarBeing) return false;
+	return false;
 
 	float px = (float)x / windowWidth, py = (float)y / windowHeight;
 	return comparisonBarX - comparisonBarThickness < px && px < comparisonBarX + comparisonBarThickness && 0.4 < py && py < 0.6;
@@ -576,19 +553,15 @@ void My_Keyboard(unsigned char key, int x, int y)
 	switch (key)
 	{
 	case 'w':
-		//view = translate(view, vec3(0, 0, 1));
 		dPos = normalize(cameraFront - cameraPos);
 		break;
 	case 's':
-		//view = translate(view, vec3(0, 0, -1));
 		dPos = -normalize(cameraFront - cameraPos);
 		break;
 	case 'a':
-		//view = translate(view, vec3(-1, 0, 0));
 		dPos = -normalize(cross(cameraFront, cameraUp));
 		break;
 	case 'd':
-		//view = translate(view, vec3(1, 0, 0));
 		dPos = normalize(cross(cameraFront, cameraUp));
 		break;
 	case 'z':
@@ -630,51 +603,14 @@ void My_SpecialKeys(int key, int x, int y)
 
 void My_Menu(int id)
 {
-	glDeleteProgram(program2);
-	char *shaderSource;
 	switch(id)
 	{
 	case MENU_NO_FILTER:
-		program2 = createProgram("fragment2.shader");
-		break;
-	case MENU_IMAGE_ABSTRACTION:
-		program2 = createProgram("image abstraction.shader");
-		break;
-	case MENU_LAPLACIAN:
-		program2 = createProgram("laplacian.shader");
-		break;
-	case MENU_SHRPEN:
-		program2 = createProgram("sharpen.shader");
-		break;
-	case MENU_PIXELATION:
-		program2 = createProgram("pixelation.shader");
-		break;
-	case MENU_FISH_EYE:
-		program2 = createProgram("fish-eye.shader");
-		break;
-	case MENU_SINE_WAVE:
-		program2 = createProgram("sine wave.shader");
-		break;
-	case MENU_RED_BLUE:
-		program2 = createProgram("red-blue stereo.shader");
-		break;
-	case MENU_BLOOM:
-		program2 = createProgram("bloom.shader");
-		break;
-	case MENU_MAGNIFIER:
-		program2 = createProgram("magnifier.shader");
+		
 		break;
 	default:
 		break;
 	}
-
-	if (um4height != -1) {
-		glUseProgram(program2);
-		glUniform1i(um4height, windowHeight);
-		glUseProgram(program);
-	}
-
-	comparisonBarBeing = id != MENU_NO_FILTER;
 
 	glutPostRedisplay();
 }
@@ -707,15 +643,6 @@ int main(int argc, char *argv[])
 
 	glutSetMenu(menu_main);
 	glutAddMenuEntry("No Filter", MENU_NO_FILTER);
-	glutAddMenuEntry("Image Abstraction", MENU_IMAGE_ABSTRACTION);
-	glutAddMenuEntry("Laplacian Filter", MENU_LAPLACIAN);
-	glutAddMenuEntry("Sharpen Filter", MENU_SHRPEN);
-	glutAddMenuEntry("Pixelation", MENU_PIXELATION);
-	glutAddMenuEntry("Fish-eye distortion", MENU_FISH_EYE);
-	glutAddMenuEntry("Sine wave distortion", MENU_SINE_WAVE);
-	glutAddMenuEntry("Red-Blue Stereo", MENU_RED_BLUE);
-	glutAddMenuEntry("Bloom Effect", MENU_BLOOM);
-	glutAddMenuEntry("Magnifier", MENU_MAGNIFIER);
 	glutAttachMenu(GLUT_RIGHT_BUTTON);
 
 	// Register GLUT callback functions.
