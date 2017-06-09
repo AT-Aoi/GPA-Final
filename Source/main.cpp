@@ -21,11 +21,6 @@ GLubyte timer_cnt = 0;
 bool timer_enabled = true;
 unsigned int timer_speed = 16;
 
-float comparisonBarX = 0.5;
-float comparisonBarThickness = 0.005;
-bool comparisonBarChanging = false;
-bool comparisonBarBeing = false;
-
 using namespace glm;
 using namespace std;
 
@@ -504,24 +499,11 @@ void traceMouse(int x, int y)
 	glutPostRedisplay();
 }
 
-bool mouseInComparisonBar(int x, int y) {
-	return false;
-
-	float px = (float)x / windowWidth, py = (float)y / windowHeight;
-	return comparisonBarX - comparisonBarThickness < px && px < comparisonBarX + comparisonBarThickness && 0.4 < py && py < 0.6;
-}
-
 void recordMouse(int x, int y) {
 	if (um4mouse != -1) {
 		glUseProgram(program2);
 		glUniform2i(um4mouse, x, y);
 		glUseProgram(program);
-	}
-
-	if (mouseInComparisonBar(x, y)) {
-		glutSetCursor(GLUT_CURSOR_LEFT_RIGHT);
-	} else {
-		glutSetCursor(GLUT_CURSOR_INHERIT);
 	}
 }
 
@@ -530,19 +512,14 @@ void My_Mouse(int button, int state, int x, int y)
 	if(state == GLUT_DOWN)
 	{
 		printf("Mouse %d is pressed at (%d, %d)\n", button, x, y);
-		if (mouseInComparisonBar(x, y)) {
-			comparisonBarChanging = true;
-		} else {
-			downX = x;
-			downY = y;
-			downCameraFront = cameraFront;
-			downCameraUp = cameraUp;
-		}
+		downX = x;
+		downY = y;
+		downCameraFront = cameraFront;
+		downCameraUp = cameraUp;
 	}
 	else if(state == GLUT_UP)
 	{
 		printf("Mouse %d is released at (%d, %d)\n", button, x, y);
-		if (comparisonBarChanging) comparisonBarChanging = false;
 	}
 }
 
