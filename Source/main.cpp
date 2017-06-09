@@ -223,6 +223,8 @@ void loadMeshes() {
 	}
 }
 
+GLuint currentProgram;
+
 GLuint program;
 GLuint mv_location;
 GLuint proj_location;
@@ -231,7 +233,7 @@ mat4 view;
 mat4 projection;
 
 GLuint program2;
-GLuint um4mouse;
+GLuint um4test;
 int time;
 GLuint um4time;
 GLuint window_vao;
@@ -248,9 +250,15 @@ static const GLfloat window_positions[] =
 	1.0f,1.0f,1.0f,1.0f
 };
 
+/// wrapper，用来记录当前 program
+void useProgram(GLuint program) {
+	glUseProgram(program);
+	currentProgram = program;
+}
+
 void render() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glUseProgram(program);
+	useProgram(program);
 	glUniformMatrix4fv(mv_location, 1, GL_FALSE, (const GLfloat*)&(view * model));
 	glUniformMatrix4fv(proj_location, 1, GL_FALSE, (const GLfloat*)&projection);
 	glActiveTexture(GL_TEXTURE0);
@@ -296,7 +304,6 @@ GLuint createProgram(char *fragmentShaderSourcePath) {
 	glAttachShader(newProgram, fragmentShader2);
 	glLinkProgram(newProgram);
 
-	um4mouse = glGetUniformLocation(newProgram, "mouse");
 	um4time = glGetUniformLocation(newProgram, "time");
 
 	// 初始这个 program 的 uniform 参数
@@ -338,10 +345,11 @@ void initShader() {
 	glLinkProgram(program);
 
 	// Tell OpenGL to use this shader program now
-	glUseProgram(program);
+	useProgram(program);
 
 	mv_location = glGetUniformLocation(program, "um4mv");
 	proj_location = glGetUniformLocation(program, "um4p");
+	um4test = glGetUniformLocation(program, "test");
 
 	program2 = createProgram(DEFAULT_SHADER);
 
@@ -385,7 +393,7 @@ void My_Display()
 	glDrawBuffer(GL_COLOR_ATTACHMENT0);
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glUseProgram(program);
+	useProgram(program);
 
 	static const GLfloat white[] = { 1.0f, 1.0f, 1.0f, 1.0f };
 	static const GLfloat one = 1.0f;
@@ -411,13 +419,13 @@ void My_Display()
 	// (1) Bind the vao we want to render
 	// (2) Use the correct shader program
 	glBindVertexArray(window_vao);
-	glUseProgram(program2);
+	useProgram(program2);
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
 	if (um4time != -1) {
-		glUseProgram(program2);
+		useProgram(program2);
 		glUniform1i(um4time, time);
-		glUseProgram(program);
+		useProgram(program);
 	}
 
 	glutSwapBuffers();
@@ -477,6 +485,27 @@ void My_Timer(int val)
 	glutTimerFunc(timer_speed, My_Timer, val);
 }
 
+// 用做测试，给 program 维护一个 test vec，并在把数字显示在标题
+void updateTestUniform(int x, int y) {
+	float fx = x / 600.0;
+	float fy = y / 600.0;
+
+	char title[30];
+	if (um4test != -1) {
+		GLuint oldProgram = -1;
+		if (currentProgram != program) {
+			oldProgram = currentProgram;
+			useProgram(program);
+		}
+
+		glUniform2f(um4test, fx, fy);
+		sprintf(title, "(%.3f, %.3f)", fx, fy);
+		glutSetWindowTitle(title);
+
+		if (oldProgram != -1) useProgram(oldProgram);
+	}
+}
+
 int downX, downY;
 vec3 downCameraFront, downCameraUp;
 float speed = 0.5;
@@ -484,11 +513,7 @@ void traceMouse(int x, int y)
 {
 	printf("Mouse is over at (%d, %d)\n", x, y);
 
-	if (um4mouse != -1) {
-		glUseProgram(program2);
-		glUniform2i(um4mouse, x, y);
-		glUseProgram(program);
-	}
+	updateTestUniform(x, y);
 
 	mat4 rotation = rotate(mat4(), (float)deg2rad(y - downY) * speed, cross(downCameraFront, downCameraUp)) *
 		rotate(mat4(), (float)deg2rad(x - downX) * speed, downCameraUp);
@@ -497,14 +522,6 @@ void traceMouse(int x, int y)
 	view = lookAt(cameraPos, cameraFront, cameraUp);
 
 	glutPostRedisplay();
-}
-
-void recordMouse(int x, int y) {
-	if (um4mouse != -1) {
-		glUseProgram(program2);
-		glUniform2i(um4mouse, x, y);
-		glUseProgram(program);
-	}
 }
 
 void My_Mouse(int button, int state, int x, int y)
@@ -630,7 +647,7 @@ int main(int argc, char *argv[])
 	glutSpecialFunc(My_SpecialKeys);
 	glutTimerFunc(timer_speed, My_Timer, 0); 
 	glutMotionFunc(traceMouse);
-	glutPassiveMotionFunc(recordMouse);
+	glutPassiveMotionFunc(updateTestUniform);
 	
 	// Enter main event loop.
 	glutMainLoop();
