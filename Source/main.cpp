@@ -514,9 +514,11 @@ void traceMouse(int x, int y)
 	printf("Mouse is over at (%d, %d)\n", x, y);
 
 	updateTestUniform(x, y);
+	
+	float dx = x - downX, dy = y - downY;
+	mat4 rotation = rotate(mat4(), (float)deg2rad(length(vec2(dx, dy))) * speed,
+		normalize(downCameraUp) * dx + normalize(cross(downCameraFront, downCameraUp)) * dy);
 
-	mat4 rotation = rotate(mat4(), (float)deg2rad(y - downY) * speed, cross(downCameraFront, downCameraUp)) *
-		rotate(mat4(), (float)deg2rad(x - downX) * speed, downCameraUp);
 	cameraFront = mat3(rotation) * downCameraFront;
 	cameraUp = mat3(rotation) * downCameraUp;
 	view = lookAt(cameraPos, cameraFront, cameraUp);
