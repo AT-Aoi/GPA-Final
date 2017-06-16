@@ -25,6 +25,7 @@ using namespace glm;
 using namespace std;
 
 #define SCENE_PATH "./lost-empire/"
+#define SCENE_FILE "lost_empire.obj"
 char** loadShaderSource(const char* file)
 {
     FILE* fp = fopen(file, "rb");
@@ -379,7 +380,7 @@ void My_Init()
 
 	initShader();
 
-	scene = aiImportFile(SCENE_PATH "lost_empire.obj", aiProcessPreset_TargetRealtime_Fast);
+	scene = aiImportFile(SCENE_PATH SCENE_FILE, aiProcessPreset_TargetRealtime_Fast);
 	
 	loadMaterials();
 	loadMeshes();
