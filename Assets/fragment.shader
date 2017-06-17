@@ -67,6 +67,7 @@ void main()
 	testFunc();
 
 	vec3 color = texture(tex, vertexData.texcoord).rgb;
+	if (color == vec3(0)) discard;
 	color = lighting(color);
 	color = makeFog(color);
 
