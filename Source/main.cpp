@@ -11,8 +11,7 @@
 #define MENU_RED_BLUE 8
 #define MENU_BLOOM 9
 #define MENU_MAGNIFIER 10
-
-#define DEFAULT_SHADER "fragment2.shader"
+#define CAMERA_TYPE2 true
 
 #include <string>
 #include <set>
@@ -24,6 +23,7 @@ unsigned int timer_speed = 16;
 using namespace glm;
 using namespace std;
 
+#define DEFAULT_SHADER "fragment2.shader"
 //#define SCENE_PATH "./lost-empire/"
 //#define SCENE_FILE "lost_empire.obj"
 #define SCENE_PATH "./Mountains2/"
@@ -443,12 +443,12 @@ void My_Display()
 	glutSwapBuffers();
 }
 
-//glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 0.0f);
-//glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
-//glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
-glm::vec3 cameraPos = glm::vec3(-35.72, 70.82, 96.06);
-glm::vec3 cameraFront = glm::vec3(69.83, -93.05, -94.45);
-glm::vec3 cameraUp = glm::vec3(-0.02, 0.90, -0.44);
+//vec3 cameraPos = vec3(0.0f, 0.0f, 0.0f);
+//vec3 cameraFront = vec3(0.0f, 0.0f, -1.0f);
+//vec3 cameraUp = vec3(0.0f, 1.0f, 0.0f);
+vec3 cameraPos = vec3(-23.54, 42.39, 2.00);
+vec3 cameraTarget = vec3(103.65, 42.09, 139.51);
+vec3 cameraUp = vec3(0.06, 1.00, 0.01);
 int windowWidth, windowHeight;
 void My_Reshape(int width, int height)
 {
@@ -459,7 +459,7 @@ void My_Reshape(int width, int height)
 	float viewportAspect = (float)width / (float)height;
 	projection = perspective(radians(60.0f), viewportAspect, 0.1f, 1000.0f);
 
-	view = lookAt(cameraPos, cameraFront, cameraUp);
+	view = lookAt(cameraPos, cameraTarget, cameraUp);
 
 	// If the windows is reshaped, we need to reset some settings of framebuffer
 	glDeleteRenderbuffers(1, &depthRBO);
@@ -518,7 +518,7 @@ void calculatePlane(tuple<aiVector3D*, aiVector3D*, aiVector3D*> cameraTriangle,
 
 tuple<aiVector3D*, aiVector3D*, aiVector3D*> cameraTriangle;
 // 让镜头下掉至地面上
-float cameraHeight = 10;
+float cameraHeight = 20;
 float fallSpeed = 1;
 void fallCamera() {
 	float a, b, c, d; // 平面方程式参数
@@ -528,7 +528,7 @@ void fallCamera() {
 	float newY = std::max(cameraPos.y - fallSpeed, groundY + cameraHeight);
 	if (cameraPos.y != newY) {
 		cameraPos.y = newY;
-		lookAt(cameraFront, cameraPos, cameraUp);
+		lookAt(cameraPos, cameraTarget, cameraUp);
 		glutPostRedisplay();
 	}
 }
@@ -564,31 +564,48 @@ void updateTestUniform(int x, int y) {
 	}
 }
 
-int downX, downY;
 int oldX, oldY;
-vec3 downCameraFront, downCameraUp;
 float speed = 0.5;
+const float FPS_CAMERA_VERTICAL_ROTATION_RATE = 0.5;
 void traceMouse(int x, int y)
 {
 //	printf("Mouse is over at (%d, %d)\n", x, y);
 
-	if (x != oldX && y != oldY) {
+	if (x != oldX || y != oldY) {
 		updateTestUniform(x, y);
-	//mat4 rotation = rotate(mat4(), (float)deg2rad(y - downY) * speed, cross(downCameraFront, downCameraUp)) *
-		//-rotate(mat4(), (float)deg2rad(x - downX) * speed, downCameraUp);
 
 		float dx = x - oldX, dy = y - oldY;
+		if (CAMERA_TYPE2) dy *= FPS_CAMERA_VERTICAL_ROTATION_RATE; // 垂直镜头旋转幅度小一点
+
+		vec3 cameraFront = cameraTarget - cameraPos;
+		vec3 up = vec3(0, 1, 0);
 		mat4 rotation = rotate(mat4(), (float)deg2rad(length(vec2(dx, dy))) * speed,
-			normalize(cameraUp) * dx + normalize(cross(cameraFront, cameraUp)) * dy);
+			normalize(up) * dx + normalize(cross(cameraFront, up)) * dy);
 
+		//if (FPS_CAMERA) { // 限制镜头仰角俯角
+		//	vec3 horizontalFront = cameraFront;
+		//	horizontalFront.y = 0;
 
-		cameraFront = mat3(rotation) * cameraFront;
+		//	float angle = degrees(acos(dot(normalize(cameraFront), normalize(horizontalFront))));
+		//	if (abs(angle) < 20) cameraTarget = mat3(rotation) * cameraTarget;
+		//	printf("angle: %.2f\n", angle);
+
+		//} else {
+			cameraTarget = mat3(rotation) * cameraTarget;
+		//}
 		cameraUp = mat3(rotation) * cameraUp;
-		view = lookAt(cameraPos, cameraFront, cameraUp);
+
+
+		view = lookAt(cameraPos, cameraTarget, cameraUp);
 
 		oldX = x;
 		oldY = y;
+
 		glutPostRedisplay();
+
+		printf("cameraPos:	(%.2f, %.2f, %.2f)\n", cameraPos.x, cameraPos.y, cameraPos.z);
+		printf("cameraFront:	(%.2f, %.2f, %.2f)\n", cameraTarget.x, cameraTarget.y, cameraTarget.z);
+		printf("cameraUp:	(%.2f, %.2f, %.2f)\n", cameraUp.x, cameraUp.y, cameraUp.z);
 	}
 }
 
@@ -597,12 +614,8 @@ void My_Mouse(int button, int state, int x, int y)
 	if(state == GLUT_DOWN)
 	{
 		printf("Mouse %d is pressed at (%d, %d)\n", button, x, y);
-		downX = x;
-		downY = y;
 		oldX = x;
 		oldY = y;
-		downCameraFront = cameraFront;
-		downCameraUp = cameraUp;
 	}
 	else if(state == GLUT_UP)
 	{
@@ -651,36 +664,59 @@ void My_Keyboard(unsigned char key, int x, int y)
 {
 	printf("Key %c is pressed at (%d, %d)\n", key, x, y);
 	vec3 dPos;
-	switch (key)
-	{
-	case 'w':
-		dPos = normalize(cameraFront - cameraPos);
-		break;
-	case 's':
-		dPos = -normalize(cameraFront - cameraPos);
-		break;
-	case 'a':
-		dPos = -normalize(cross(cameraFront, cameraUp));
-		break;
-	case 'd':
-		dPos = normalize(cross(cameraFront, cameraUp));
-		break;
-	case 'z':
-		dPos = normalize(cameraUp);
-		break;
-	case 'x':
-		dPos = -normalize(cameraUp);
-		break;
-	default:
-		break;
+	vec3 cameraFront = cameraTarget - cameraPos;
+	if (CAMERA_TYPE2) {
+		switch (key)
+		{
+		case 'w':
+			dPos = cameraFront;
+			break;
+		case 's':
+			dPos = -cameraFront;
+			break;
+		case 'a':
+			dPos = -cross(cameraFront, cameraUp);
+			break;
+		case 'd':
+			dPos = cross(cameraFront, cameraUp);
+			break;
+		default:
+			break;
+		}
+		dPos.y = 0;
+		dPos = normalize(dPos);
+	} else {
+		switch (key)
+		{
+		case 'w':
+			dPos = normalize(cameraFront);
+			break;
+		case 's':
+			dPos = -normalize(cameraFront);
+			break;
+		case 'a':
+			dPos = -normalize(cross(cameraFront, cameraUp));
+			break;
+		case 'd':
+			dPos = normalize(cross(cameraFront, cameraUp));
+			break;
+		case 'z':
+			dPos = normalize(cameraUp);
+			break;
+		case 'x':
+			dPos = -normalize(cameraUp);
+			break;
+		default:
+			break;
+		}
 	}
 	cameraPos += dPos;
-	cameraFront += dPos;
+	cameraTarget += dPos;
 	//cameraUp += dPos;
-	view = lookAt(cameraPos, cameraFront, cameraUp);
-	printf("cameraPos: (%.2f, %.2f, %.2f)\n", cameraPos.x, cameraPos.y, cameraPos.z);
-	//printf("cameraFront: (%.2f, %.2f, %.2f)\n", cameraFront.x, cameraFront.y, cameraFront.z);
-	//printf("cameraUp: (%.2f, %.2f, %.2f)\n", cameraUp.x, cameraUp.y, cameraUp.z);
+	view = lookAt(cameraPos, cameraTarget, cameraUp);
+	printf("cameraPos:		(%.2f, %.2f, %.2f)\n", cameraPos.x, cameraPos.y, cameraPos.z);
+	printf("cameraFront:	(%.2f, %.2f, %.2f)\n", cameraTarget.x, cameraTarget.y, cameraTarget.z);
+	printf("cameraUp:		(%.2f, %.2f, %.2f)\n", cameraUp.x, cameraUp.y, cameraUp.z);
 }
 
 void My_SpecialKeys(int key, int x, int y)
