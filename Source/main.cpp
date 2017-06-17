@@ -508,23 +508,28 @@ void updateTestUniform(int x, int y) {
 }
 
 int downX, downY;
+int oldX, oldY;
 vec3 downCameraFront, downCameraUp;
 float speed = 0.5;
 void traceMouse(int x, int y)
 {
 	printf("Mouse is over at (%d, %d)\n", x, y);
 
-	updateTestUniform(x, y);
-	
-	float dx = x - downX, dy = y - downY;
-	mat4 rotation = rotate(mat4(), (float)deg2rad(length(vec2(dx, dy))) * speed,
-		normalize(downCameraUp) * dx + normalize(cross(downCameraFront, downCameraUp)) * dy);
+	if (x != oldX && y != oldY) {
+		updateTestUniform(x, y);
 
-	cameraFront = mat3(rotation) * downCameraFront;
-	cameraUp = mat3(rotation) * downCameraUp;
-	view = lookAt(cameraPos, cameraFront, cameraUp);
+		float dx = x - oldX, dy = y - oldY;
+		mat4 rotation = rotate(mat4(), (float)deg2rad(length(vec2(dx, dy))) * speed,
+			normalize(cameraUp) * dx + normalize(cross(cameraFront, cameraUp)) * dy);
 
-	glutPostRedisplay();
+		cameraFront = mat3(rotation) * cameraFront;
+		cameraUp = mat3(rotation) * cameraUp;
+		view = lookAt(cameraPos, cameraFront, cameraUp);
+
+		oldX = x;
+		oldY = y;
+		glutPostRedisplay();
+	}
 }
 
 void My_Mouse(int button, int state, int x, int y)
@@ -534,6 +539,8 @@ void My_Mouse(int button, int state, int x, int y)
 		printf("Mouse %d is pressed at (%d, %d)\n", button, x, y);
 		downX = x;
 		downY = y;
+		oldX = x;
+		oldY = y;
 		downCameraFront = cameraFront;
 		downCameraUp = cameraUp;
 	}
