@@ -26,8 +26,8 @@ using namespace std;
 #define DEFAULT_SHADER "fragment2.shader"
 //#define SCENE_PATH "./lost-empire/"
 //#define SCENE_FILE "lost_empire.obj"
-#define SCENE_PATH "./Mountains2/"
-#define SCENE_FILE "Mountains2.obj"
+#define SCENE_PATH "./tmp3/"
+#define SCENE_FILE "tmp3.obj"
 char** loadShaderSource(const char* file)
 {
     FILE* fp = fopen(file, "rb");
@@ -663,7 +663,7 @@ tuple<aiVector3D*, aiVector3D*, aiVector3D*> getCameraTriangle() {
 void My_Keyboard(unsigned char key, int x, int y)
 {
 	printf("Key %c is pressed at (%d, %d)\n", key, x, y);
-	vec3 dPos;
+	vec3 dPos = vec3(0);
 	vec3 cameraFront = cameraTarget - cameraPos;
 	if (CAMERA_TYPE2) {
 		switch (key)
@@ -710,6 +710,9 @@ void My_Keyboard(unsigned char key, int x, int y)
 			break;
 		}
 	}
+
+	if (dPos == vec3(0)) return;
+
 	cameraPos += dPos;
 	cameraTarget += dPos;
 	//cameraUp += dPos;
