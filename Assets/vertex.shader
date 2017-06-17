@@ -19,7 +19,11 @@ out VertexData
 vec3 light = vec3(-30, 60, 80);
 
 void testFunc() {
-	if (test.x == 0 && test.y == 0) return;
+	if (test.x == 0 && test.y == 0) {
+//		test.x = 0.5;
+//		test.y = 0.5;
+		return;
+	}
 
 	light = vec3(test.x * 50, test.y * 50, 50);
 }

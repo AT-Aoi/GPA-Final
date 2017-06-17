@@ -24,8 +24,10 @@ unsigned int timer_speed = 16;
 using namespace glm;
 using namespace std;
 
-#define SCENE_PATH "./lost-empire/"
-#define SCENE_FILE "lost_empire.obj"
+//#define SCENE_PATH "./lost-empire/"
+//#define SCENE_FILE "lost_empire.obj"
+#define SCENE_PATH "./Mountains2/"
+#define SCENE_FILE "Mountains2.obj"
 char** loadShaderSource(const char* file)
 {
     FILE* fp = fopen(file, "rb");
@@ -162,11 +164,16 @@ void loadMaterials() {
 	}
 }
 
+
+string groundName = "g Mountains";
+vector<aiMesh*> grounds;
 void loadMeshes() {
 	for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 	{
 		aiMesh *mesh = scene->mMeshes[i];
 		Shape shape;
+		if (strstr(mesh->mName.C_Str(), groundName.c_str())) grounds.push_back(mesh);
+		printf("mesh[%d].name: %s\n", i, mesh->mName.C_Str());
 		glGenVertexArrays(1, &shape.vao);
 		glBindVertexArray(shape.vao);
 		glEnableVertexAttribArray(0);
@@ -298,6 +305,7 @@ GLuint createProgram(char *fragmentShaderSourcePath) {
 	glCompileShader(vertexShader2);
 	glCompileShader(fragmentShader2);
 
+	glPrintShaderLog(vertexShader2);
 	glPrintShaderLog(fragmentShader2);
 
 	// Assign the program we created before with these shaders
@@ -339,6 +347,9 @@ void initShader() {
 	// Compile these shaders
 	glCompileShader(vertexShader);
 	glCompileShader(fragmentShader);
+
+	glPrintShaderLog(vertexShader);
+	glPrintShaderLog(fragmentShader);
 
 	// Assign the program we created before with these shaders
 	glAttachShader(program, vertexShader);
@@ -479,9 +490,55 @@ void My_Reshape(int width, int height)
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, FBODataTexture, 0);
 }
 
+void calculatePlane(tuple<aiVector3D*, aiVector3D*, aiVector3D*> cameraTriangle, float &a, float &b, float &c, float &d) {
+	aiVector3D *v1 = get<0>(cameraTriangle);
+	aiVector3D *v2 = get<1>(cameraTriangle);
+	aiVector3D *v3 = get<2>(cameraTriangle);
+	d = 1;
+	float detD = determinant(mat3(
+		v1->x, v1->y, v1->z,
+		v2->x, v2->y, v2->z,
+		v3->x, v3->y, v3->z));
+	float detDa = -d * determinant(mat3(
+		1, v1->y, v1->z,
+		1, v2->y, v2->z,
+		1, v3->y, v3->z));
+	float detDb = -d * determinant(mat3(
+		v1->x, 1, v1->z,
+		v2->x, 1, v2->z,
+		v3->x, 1, v3->z));
+	float detDc = -d * determinant(mat3(
+		v1->x, v1->y, 1,
+		v2->x, v2->y, 1,
+		v3->x, v3->y, 1));
+	a = detDa / detD;
+	b = detDb / detD;
+	c = detDc / detD;
+}
+
+tuple<aiVector3D*, aiVector3D*, aiVector3D*> cameraTriangle;
+// 让镜头下掉至地面上
+float cameraHeight = 10;
+float fallSpeed = 1;
+void fallCamera() {
+	float a, b, c, d; // 平面方程式参数
+	calculatePlane(cameraTriangle, a, b, c, d);
+	float groundY = - (a * cameraPos.x + c * cameraPos.z + d) / b;
+//	printf("groundY: %.2f\n", groundY);
+	float newY = std::max(cameraPos.y - fallSpeed, groundY + cameraHeight);
+	if (cameraPos.y != newY) {
+		cameraPos.y = newY;
+		lookAt(cameraFront, cameraPos, cameraUp);
+		glutPostRedisplay();
+	}
+}
+
+tuple<aiVector3D*, aiVector3D*, aiVector3D*> getCameraTriangle();
 void My_Timer(int val)
 {
 	++time;
+	cameraTriangle = getCameraTriangle();
+	if (get<0>(cameraTriangle)) fallCamera();
 	glutPostRedisplay();
 	glutTimerFunc(timer_speed, My_Timer, val);
 }
@@ -513,14 +570,17 @@ vec3 downCameraFront, downCameraUp;
 float speed = 0.5;
 void traceMouse(int x, int y)
 {
-	printf("Mouse is over at (%d, %d)\n", x, y);
+//	printf("Mouse is over at (%d, %d)\n", x, y);
 
 	if (x != oldX && y != oldY) {
 		updateTestUniform(x, y);
+	//mat4 rotation = rotate(mat4(), (float)deg2rad(y - downY) * speed, cross(downCameraFront, downCameraUp)) *
+		//-rotate(mat4(), (float)deg2rad(x - downX) * speed, downCameraUp);
 
 		float dx = x - oldX, dy = y - oldY;
 		mat4 rotation = rotate(mat4(), (float)deg2rad(length(vec2(dx, dy))) * speed,
 			normalize(cameraUp) * dx + normalize(cross(cameraFront, cameraUp)) * dy);
+
 
 		cameraFront = mat3(rotation) * cameraFront;
 		cameraUp = mat3(rotation) * cameraUp;
@@ -548,6 +608,43 @@ void My_Mouse(int button, int state, int x, int y)
 	{
 		printf("Mouse %d is released at (%d, %d)\n", button, x, y);
 	}
+}
+
+bool toLeft(const aiVector3D &p, const aiVector3D &q, const vec3 &s) {
+	return	p.x * q.z - p.z * q.x
+		+	q.x * s.z - q.z * s.x
+		+	s.x * p.z - s.z * p.x > 0;
+}
+
+bool belowCamera(const aiVector3D &p, const aiVector3D &q, const aiVector3D &s) {
+	bool left1 = toLeft(p, q, cameraPos);
+	bool left2 = toLeft(q, s, cameraPos);
+	bool left3 = toLeft(s, p, cameraPos);
+	//printf("toLeft: (%d %d %d)\n", left1, left2, left3);
+	return left1 == left2 && left2 == left3;
+}
+
+tuple<aiVector3D*, aiVector3D*, aiVector3D*> getCameraTriangle() {
+	for (unsigned i = 0; i < grounds.size(); ++i) {
+		aiMesh *ground = grounds[i];
+		for (unsigned j = 0; j < ground->mNumFaces; ++j) {
+			aiFace &face = ground->mFaces[j];
+			tuple<aiVector3D*, aiVector3D*, aiVector3D*> t = make_tuple(
+				&ground->mVertices[face.mIndices[0]],
+				&ground->mVertices[face.mIndices[1]],
+				&ground->mVertices[face.mIndices[2]]);
+			if (belowCamera(*get<0>(t), *get<1>(t), *get<2>(t))) {
+//				printf("camera: (%.2f, %.2f, %.2f) in triangle (%.2f, %.2f, %.2f), (%.2f, %.2f, %.2f), (%.2f, %.2f, %.2f)\n",
+					//cameraPos.x, cameraPos.y, cameraPos.z,
+					//get<0>(t)->x, get<0>(t)->y, get<0>(t)->z,
+					//get<1>(t)->x, get<1>(t)->y, get<1>(t)->z,
+					//get<2>(t)->x, get<2>(t)->y, get<2>(t)->z);
+				return t;
+			}
+		}
+	}
+
+	return make_tuple(nullptr, nullptr, nullptr);
 }
 
 void My_Keyboard(unsigned char key, int x, int y)
