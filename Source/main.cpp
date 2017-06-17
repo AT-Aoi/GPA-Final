@@ -24,8 +24,8 @@ unsigned int timer_speed = 16;
 using namespace glm;
 using namespace std;
 
-#define SCENE_PATH "./lost-empire/"
-#define SCENE_FILE "lost_empire.obj"
+#define SCENE_PATH "./Mountains2/"
+#define SCENE_FILE "Mountains2.obj"
 char** loadShaderSource(const char* file)
 {
     FILE* fp = fopen(file, "rb");
@@ -167,6 +167,7 @@ void loadMeshes() {
 	{
 		aiMesh *mesh = scene->mMeshes[i];
 		Shape shape;
+		printf("mesh[%d].name: %s\n", i, mesh->mName.C_Str());
 		glGenVertexArrays(1, &shape.vao);
 		glBindVertexArray(shape.vao);
 		glEnableVertexAttribArray(0);
@@ -298,6 +299,7 @@ GLuint createProgram(char *fragmentShaderSourcePath) {
 	glCompileShader(vertexShader2);
 	glCompileShader(fragmentShader2);
 
+	glPrintShaderLog(vertexShader2);
 	glPrintShaderLog(fragmentShader2);
 
 	// Assign the program we created before with these shaders
@@ -339,6 +341,9 @@ void initShader() {
 	// Compile these shaders
 	glCompileShader(vertexShader);
 	glCompileShader(fragmentShader);
+
+	glPrintShaderLog(vertexShader);
+	glPrintShaderLog(fragmentShader);
 
 	// Assign the program we created before with these shaders
 	glAttachShader(program, vertexShader);
