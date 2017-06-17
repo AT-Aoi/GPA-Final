@@ -679,8 +679,8 @@ void My_Keyboard(unsigned char key, int x, int y)
 	//cameraUp += dPos;
 	view = lookAt(cameraPos, cameraFront, cameraUp);
 	printf("cameraPos: (%.2f, %.2f, %.2f)\n", cameraPos.x, cameraPos.y, cameraPos.z);
-	printf("cameraFront: (%.2f, %.2f, %.2f)\n", cameraFront.x, cameraFront.y, cameraFront.z);
-	printf("cameraUp: (%.2f, %.2f, %.2f)\n", cameraUp.x, cameraUp.y, cameraUp.z);
+	//printf("cameraFront: (%.2f, %.2f, %.2f)\n", cameraFront.x, cameraFront.y, cameraFront.z);
+	//printf("cameraUp: (%.2f, %.2f, %.2f)\n", cameraUp.x, cameraUp.y, cameraUp.z);
 }
 
 void My_SpecialKeys(int key, int x, int y)
