@@ -24,8 +24,10 @@ unsigned int timer_speed = 16;
 using namespace glm;
 using namespace std;
 
-#define SCENE_PATH "./Mountains2/"
-#define SCENE_FILE "Mountains2.obj"
+#define SCENE_PATH "./lost-empire/"
+#define SCENE_FILE "lost_empire.obj"
+//#define SCENE_PATH "./Mountains2/"
+//#define SCENE_FILE "Mountains2.obj"
 char** loadShaderSource(const char* file)
 {
     FILE* fp = fopen(file, "rb");
@@ -162,11 +164,15 @@ void loadMaterials() {
 	}
 }
 
+
+string groundName = "g Mountains";
+vector<aiMesh*> grounds;
 void loadMeshes() {
 	for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 	{
 		aiMesh *mesh = scene->mMeshes[i];
 		Shape shape;
+		if (strstr(mesh->mName.C_Str(), groundName.c_str())) grounds.push_back(mesh);
 		printf("mesh[%d].name: %s\n", i, mesh->mName.C_Str());
 		glGenVertexArrays(1, &shape.vao);
 		glBindVertexArray(shape.vao);
@@ -484,9 +490,13 @@ void My_Reshape(int width, int height)
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, FBODataTexture, 0);
 }
 
+aiFace *getGroundTriangleBelowCamera();
 void My_Timer(int val)
 {
 	++time;
+	if (time % 30) {
+		getGroundTriangleBelowCamera();
+	}
 	glutPostRedisplay();
 	glutTimerFunc(timer_speed, My_Timer, val);
 }
@@ -514,7 +524,7 @@ void updateTestUniform(int x, int y) {
 
 int downX, downY;
 vec3 downCameraFront, downCameraUp;
-float speed = 0.5;
+float speed = 0.1;
 void traceMouse(int x, int y)
 {
 	printf("Mouse is over at (%d, %d)\n", x, y);
@@ -524,6 +534,9 @@ void traceMouse(int x, int y)
 	float dx = x - downX, dy = y - downY;
 	mat4 rotation = rotate(mat4(), (float)deg2rad(length(vec2(dx, dy))) * speed,
 		normalize(downCameraUp) * dx + normalize(cross(downCameraFront, downCameraUp)) * dy);
+	//mat4 rotation = rotate(mat4(), (float)deg2rad(y - downY) * speed, cross(downCameraFront, downCameraUp)) *
+		//-rotate(mat4(), (float)deg2rad(x - downX) * speed, downCameraUp);
+
 
 	cameraFront = mat3(rotation) * downCameraFront;
 	cameraUp = mat3(rotation) * downCameraUp;
@@ -546,6 +559,40 @@ void My_Mouse(int button, int state, int x, int y)
 	{
 		printf("Mouse %d is released at (%d, %d)\n", button, x, y);
 	}
+}
+
+bool toLeft(const aiVector3D &p, const aiVector3D &q, const vec3 &s) {
+	return	p.x * q.z - p.z * q.x
+		+	q.x * s.z - q.z * s.x
+		+	s.x * p.z - s.z * p.x > 0;
+}
+
+bool belowCamera(const aiVector3D &p, const aiVector3D &q, const aiVector3D &s) {
+	bool left1 = toLeft(p, q, cameraPos);
+	bool left2 = toLeft(q, s, cameraPos);
+	bool left3 = toLeft(s, p, cameraPos);
+	//printf("toLeft: (%d %d %d)\n", left1, left2, left3);
+	return left1 == left2 && left2 == left3;
+}
+
+aiFace *getGroundTriangleBelowCamera() {
+	for (unsigned i = 0; i < grounds.size(); ++i) {
+		aiMesh *ground = grounds[i];
+		for (unsigned j = 0; j < ground->mNumFaces; ++j) {
+			aiFace &face = ground->mFaces[j];
+			if (belowCamera(ground->mVertices[face.mIndices[0]],
+				ground->mVertices[face.mIndices[1]],
+				ground->mVertices[face.mIndices[2]])) {
+				printf("camera: (%.2f, %.2f, %.2f) in triangle (%.2f, %.2f, %.2f), (%.2f, %.2f, %.2f), (%.2f, %.2f, %.2f)\n",
+					cameraPos.x, cameraPos.y, cameraPos.z,
+					ground->mVertices[face.mIndices[0]].x, ground->mVertices[face.mIndices[0]].y, ground->mVertices[face.mIndices[0]].z,
+					ground->mVertices[face.mIndices[1]].x, ground->mVertices[face.mIndices[1]].y, ground->mVertices[face.mIndices[1]].z,
+					ground->mVertices[face.mIndices[2]].x, ground->mVertices[face.mIndices[2]].y, ground->mVertices[face.mIndices[2]].z);
+				return &face;
+			}
+		}
+	}
+	return nullptr;
 }
 
 void My_Keyboard(unsigned char key, int x, int y)
