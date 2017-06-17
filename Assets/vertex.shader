@@ -8,6 +8,8 @@ uniform mat4 um4mv;
 uniform mat4 um4p;
 uniform vec2 test;
 
+///====================Lighting====================
+
 out VertexData
 {
 	vec3 N; // eye space normal
@@ -16,28 +18,45 @@ out VertexData
 	vec2 texcoord;
 } vertexData;
 
-vec3 light = vec3(-30, 60, 80);
+vec3 lightPos = vec3(-30, 60, 80);
+
+void lighting() {
+	vec4 P = um4mv * vec4(iv3vertex, 1);
+	vertexData.texcoord = iv2tex_coord;
+
+	vec3 V = -P.xyz;
+	vertexData.N = mat3(um4mv) * iv3normal;
+	vertexData.L = lightPos - P.xyz;
+	vertexData.H = vertexData.L + V;
+}
+
+///====================Lighting====================
+
+///====================Fog====================
+
+out vec4 viewCoord;
+
+void makeFog() {
+	viewCoord = um4mv * vec4(iv3vertex, 1.0);
+}
+
+///====================Fog====================
 
 void testFunc() {
 	if (test.x == 0 && test.y == 0) {
-//		test.x = 0.5;
-//		test.y = 0.5;
+		//		test.x = 0.5;
+		//		test.y = 0.5;
 		return;
 	}
 
-	light = vec3(test.x * 50, test.y * 50, 50);
+	lightPos = vec3(test.x * 50, test.y * 50, 50);
 }
 
 void main()
 {
 	testFunc();
 
-	vec4 P = um4mv * vec4(iv3vertex, 1);
+	lighting();
+	makeFog();
 	gl_Position = um4p * um4mv * vec4(iv3vertex, 1.0);
-	vertexData.texcoord = iv2tex_coord;
-
-	vec3 V = -P.xyz;
-	vertexData.N = mat3(um4mv) * iv3normal;
-	vertexData.L = light - P.xyz;
-	vertexData.H = vertexData.L + V;
 }
