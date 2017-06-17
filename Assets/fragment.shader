@@ -23,17 +23,16 @@ vec3 Id = vec3(0.5, 0.5, 0.5);
 vec3 Is = vec3(1, 1, 1) * 0.515;
 float shiness = 4.43;
 
-vec3 lighting() {
+vec3 lighting(vec3 color) {
 	vec3 N = normalize(vertexData.N);
 	vec3 L = normalize(vertexData.L);
 	vec3 H = normalize(vertexData.H);
 
 	float theta = max(dot(N, L), 0);
 	float phi = max(dot(N, H), 0);
-	vec3 texColor = texture(tex, vertexData.texcoord).rgb;
 
-	vec3 ambient = texColor * Ia;
-	vec3 diffuse = texColor * Id * theta;
+	vec3 ambient = color * Ia;
+	vec3 diffuse = color * Id * theta;
 	vec3 specular = Ks * Is * pow(phi, shiness);
 
 	return ambient + diffuse + specular;
@@ -45,11 +44,14 @@ vec3 lighting() {
 
 in vec4 viewCoord;
 
-const vec4 fogColor = vec4(0.5, 0.5, 0.5, 1.0);
-float fogFactor = 0;
-float fogDensity = 0.2;
-float fog_start = 1;
-float fog_end = 6.0f;
+const vec3 fogColor = vec3(0.5, 0.5, 0.5);
+const float fogDensity = 0.005;
+
+vec3 makeFog(vec3 color) {
+	float dist = length(viewCoord);
+	float fogFactor = clamp(1.0 / exp(dist * fogDensity), 0.0, 1.0);
+	return mix(fogColor, color, fogFactor);
+}
 
 ///====================Fog====================
 
@@ -64,7 +66,9 @@ void main()
 {
 	testFunc();
 
-	vec3 lightedColor = lighting();
+	vec3 color = texture(tex, vertexData.texcoord).rgb;
+	color = lighting(color);
+	color = makeFog(color);
 
-	fragColor = vec4(lightedColor, 1.0);
+	fragColor = vec4(color, 1.0);
 }
