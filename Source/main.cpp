@@ -30,6 +30,58 @@ using namespace std;
 //#define SCENE_FILE "Mountains2.obj"
 #define SCENE_PATH "./tmp3/"
 #define SCENE_FILE "tmp3.obj"
+
+// Skybox setting 
+GLuint cubemapTexture;
+GLuint state_location;
+GLuint skyboxVAO, skyboxVBO;
+vector<const GLchar*> faces;
+GLfloat skyboxVertices[] = {
+	// Positions          
+	-1.0f,  1.0f, -1.0f,
+	-1.0f, -1.0f, -1.0f,
+	1.0f, -1.0f, -1.0f,
+	1.0f, -1.0f, -1.0f,
+	1.0f,  1.0f, -1.0f,
+	-1.0f,  1.0f, -1.0f,
+
+	-1.0f, -1.0f,  1.0f,
+	-1.0f, -1.0f, -1.0f,
+	-1.0f,  1.0f, -1.0f,
+	-1.0f,  1.0f, -1.0f,
+	-1.0f,  1.0f,  1.0f,
+	-1.0f, -1.0f,  1.0f,
+
+	1.0f, -1.0f, -1.0f,
+	1.0f, -1.0f,  1.0f,
+	1.0f,  1.0f,  1.0f,
+	1.0f,  1.0f,  1.0f,
+	1.0f,  1.0f, -1.0f,
+	1.0f, -1.0f, -1.0f,
+
+	-1.0f, -1.0f,  1.0f,
+	-1.0f,  1.0f,  1.0f,
+	1.0f,  1.0f,  1.0f,
+	1.0f,  1.0f,  1.0f,
+	1.0f, -1.0f,  1.0f,
+	-1.0f, -1.0f,  1.0f,
+
+	-1.0f,  1.0f, -1.0f,
+	1.0f,  1.0f, -1.0f,
+	1.0f,  1.0f,  1.0f,
+	1.0f,  1.0f,  1.0f,
+	-1.0f,  1.0f,  1.0f,
+	-1.0f,  1.0f, -1.0f,
+
+	-1.0f, -1.0f, -1.0f,
+	-1.0f, -1.0f,  1.0f,
+	1.0f, -1.0f, -1.0f,
+	1.0f, -1.0f, -1.0f,
+	-1.0f, -1.0f,  1.0f,
+	1.0f, -1.0f,  1.0f
+};
+// skybox setting
+
 char** loadShaderSource(const char* file)
 {
     FILE* fp = fopen(file, "rb");
@@ -166,6 +218,54 @@ void loadMaterials() {
 	}
 }
 
+//skybox cube map
+GLuint loadCubemap(vector<const GLchar*> faces)
+{
+	GLuint textureID;
+	glGenTextures(1, &textureID);
+	glActiveTexture(GL_TEXTURE0);
+
+	int width, height;
+	unsigned char* image;
+
+	glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+	for (GLuint i = 0; i < faces.size(); i++)
+	{
+		TextureData texture = loadPNG(faces[i]);
+		glTexImage2D(
+			GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0,
+			GL_RGBA8, texture.width, texture.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texture.data
+		);
+	}
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
+	return textureID;
+}
+
+void setSkybox() {
+	faces.push_back("skybox/right.png");
+	faces.push_back("skybox/left.png");
+	faces.push_back("skybox/up.png");
+	faces.push_back("skybox/down.png");
+	faces.push_back("skybox/front.png");
+	faces.push_back("skybox/back.png");
+
+	cubemapTexture = loadCubemap(faces);
+
+	glGenVertexArrays(1, &skyboxVAO);
+	glGenBuffers(1, &skyboxVBO);
+	glBindVertexArray(skyboxVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, skyboxVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), &skyboxVertices, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+}
+//skybox
 
 set<string> groundNames = { "g Mountains", "g Mountains001", "g Mountains002", "g Mountains003", "CourtYardTexturing_2", "CourtYardTexturing_3", "SidewalkMainTexturing", "CourtYardTexturing_1", "CourtYardTexturing", "StoneStepTexturing", "Street", "StoneStepTexturing_1", "Green", "Green_2", "Green_1", "VeggieFieldTexturing", "landscape_VeggieFieldTexturing", "landscape_VeggieFieldTexturing_2", "landscape_VeggieFieldTexturing_1", "landscape_Green", "VeggieFieldTexturing_1"};
 vector<aiMesh*> grounds;
@@ -273,6 +373,9 @@ void useProgram(GLuint program) {
 void render() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	useProgram(program);
+	//change state
+	glUniform1i(state_location, 0);
+	//
 	glUniformMatrix4fv(mv_location, 1, GL_FALSE, (const GLfloat*)&(view * model));
 	glUniformMatrix4fv(proj_location, 1, GL_FALSE, (const GLfloat*)&projection);
 	glActiveTexture(GL_TEXTURE0);
@@ -284,7 +387,22 @@ void render() {
 		glBindTexture(GL_TEXTURE_2D, materials[materialID].diffuse_tex);
 		glDrawElements(GL_TRIANGLES, shapes[i].drawCount, GL_UNSIGNED_INT, 0);
 	}
+	/* render skybox */
+	glUniform1i(state_location, 1);
+	mat4 Identity(1.0);
+	mat4 S = scale(Identity, vec3(100000.0f, 100000.0f, 100000.0f));
+	glUniformMatrix4fv(mv_location, 1, GL_FALSE, &S[0][0]);
 
+	glDepthMask(GL_FALSE);
+
+	glBindVertexArray(skyboxVAO);
+	glActiveTexture(GL_TEXTURE1);
+	glUniform1i(glGetUniformLocation(program, "skybox"), 1);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+
+	glDepthMask(GL_TRUE);
+	//skybox
 }
 
 GLuint createProgram(char *fragmentShaderSourcePath) {
@@ -368,6 +486,10 @@ void initShader() {
 	mv_location = glGetUniformLocation(program, "um4mv");
 	proj_location = glGetUniformLocation(program, "um4p");
 	um4test = glGetUniformLocation(program, "test");
+	//skybox
+	state_location = glGetUniformLocation(program, "state");
+	setSkybox();
+	//skybox
 
 	program2 = createProgram(DEFAULT_SHADER);
 
