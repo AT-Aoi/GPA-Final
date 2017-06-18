@@ -169,13 +169,17 @@ void loadMaterials() {
 
 set<string> groundNames = { "g Mountains", "g Mountains001", "g Mountains002", "g Mountains003", "CourtYardTexturing_2", "CourtYardTexturing_3", "SidewalkMainTexturing", "CourtYardTexturing_1", "CourtYardTexturing", "StoneStepTexturing", "Street", "StoneStepTexturing_1", "Green", "Green_2", "Green_1", "VeggieFieldTexturing", "landscape_VeggieFieldTexturing", "landscape_VeggieFieldTexturing_2", "landscape_VeggieFieldTexturing_1", "landscape_Green", "VeggieFieldTexturing_1"};
 vector<aiMesh*> grounds;
+vector<aiMesh*> obstacles;
 void loadMeshes() {
 	for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
 	{
 		aiMesh *mesh = scene->mMeshes[i];
 		Shape shape;
-		if (groundNames.find(string(mesh->mName.C_Str())) != groundNames.end()) grounds.push_back(mesh);
+
 		printf("mesh[%d].name: %s\n", i, mesh->mName.C_Str());
+		if (groundNames.find(string(mesh->mName.C_Str())) == groundNames.end()) obstacles.push_back(mesh);
+		else grounds.push_back(mesh);
+
 		glGenVertexArrays(1, &shape.vao);
 		glBindVertexArray(shape.vao);
 		glEnableVertexAttribArray(0);
@@ -448,9 +452,12 @@ void My_Display()
 //vec3 cameraPos = vec3(0.0f, 0.0f, 0.0f);
 //vec3 cameraFront = vec3(0.0f, 0.0f, -1.0f);
 //vec3 cameraUp = vec3(0.0f, 1.0f, 0.0f);
-vec3 cameraPos = vec3(-23.54, 42.39, 2.00);
-vec3 cameraTarget = vec3(103.65, 42.09, 139.51);
-vec3 cameraUp = vec3(0.06, 1.00, 0.01);
+//cameraPos:      (-204.79, 270.81, 183.95)
+//	cameraFront : (0.72, -0.55, -0.42)
+//	cameraUp : (0.34, 0.81, -0.49)
+vec3 cameraPos = vec3(-57.48, 26.90, 200.64);
+vec3 cameraFront = vec3(0.36, -0.10, -0.93);
+vec3 cameraUp = vec3(0.07, 0.99, -0.08);
 int windowWidth, windowHeight;
 void My_Reshape(int width, int height)
 {
@@ -461,7 +468,7 @@ void My_Reshape(int width, int height)
 	float viewportAspect = (float)width / (float)height;
 	projection = perspective(radians(60.0f), viewportAspect, 0.1f, 1000.0f);
 
-	view = lookAt(cameraPos, cameraTarget, cameraUp);
+	view = lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
 
 	// If the windows is reshaped, we need to reset some settings of framebuffer
 	glDeleteRenderbuffers(1, &depthRBO);
@@ -492,15 +499,15 @@ void My_Reshape(int width, int height)
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, FBODataTexture, 0);
 }
 
-void calculatePlane(tuple<aiVector3D*, aiVector3D*, aiVector3D*> cameraTriangle, float &a, float &b, float &c, float &d) {
-	aiVector3D *v1 = get<0>(cameraTriangle);
-	aiVector3D *v2 = get<1>(cameraTriangle);
-	aiVector3D *v3 = get<2>(cameraTriangle);
-	d = 1;
+void calculatePlane(const tuple<aiVector3D*, aiVector3D*, aiVector3D*> triangle, float &a, float &b, float &c, float &d) {
+	aiVector3D *v1 = get<0>(triangle);
+	aiVector3D *v2 = get<1>(triangle);
+	aiVector3D *v3 = get<2>(triangle);
+	d = 10000;
 	float detD = determinant(mat3(
 		v1->x, v1->y, v1->z,
 		v2->x, v2->y, v2->z,
-		v3->x, v3->y, v3->z));
+		v3->x, v3->y, v3->z)) + epsilon<float>();
 	float detDa = -d * determinant(mat3(
 		1, v1->y, v1->z,
 		1, v2->y, v2->z,
@@ -524,18 +531,40 @@ bool toLeft(const aiVector3D &p, const aiVector3D &q, const vec3 &s) {
 		+ s.x * p.z - s.z * p.x > 0;
 }
 
-bool belowCamera(const aiVector3D &p, const aiVector3D &q, const aiVector3D &s) {
-	bool left1 = toLeft(p, q, cameraPos);
-	bool left2 = toLeft(q, s, cameraPos);
-	bool left3 = toLeft(s, p, cameraPos);
+bool inTriangleProjectY(const aiVector3D &p, const aiVector3D &q, const aiVector3D &s, const vec3 &r) {
+	bool left1 = toLeft(p, q, r);
+	bool left2 = toLeft(q, s, r);
+	bool left3 = toLeft(s, p, r);
 	//printf("toLeft: (%d %d %d)\n", left1, left2, left3);
 	return left1 == left2 && left2 == left3;
 }
 
-float calculateAltitude(tuple<aiVector3D*, aiVector3D*, aiVector3D*> &triangle) {
-	float a, b, c, d; // 平面方程式参数
-	calculatePlane(triangle, a, b, c, d);
-	return -(a * cameraPos.x + c * cameraPos.z + d) / b;;
+float calculateAltitude(float a, float b, float c, float d) {
+	return -(a * cameraPos.x + c * cameraPos.z + d) / b;
+}
+
+vec3 calculateLinePlaneIntersection(const vec3 &v1, const vec3 &v2, float a, float b, float c, float d) {
+	vec3 v;
+	float dx = v1.x - v2.x, dy = v1.y - v2.y, dz = v1.z - v2.z;
+	float detD = determinant(mat4(
+		a, b, c, 0,
+		1, 0, 0, dx,
+		0, 1, 0, dy,
+		0, 0, 1, dz
+	));
+	float detDt = determinant(mat4(
+		a, b, c, -d,
+		1, 0, 0, v1.x,
+		0, 1, 0, v1.y,
+		0, 0, 1, v1.z
+	));
+	float t = detDt / (detD + epsilon<float>());
+
+	return vec3(
+		v1.x - dx * t,
+		v1.y - dy * t,
+		v1.z - dz * t
+	);
 }
 
 float cameraHeight = 2;
@@ -543,12 +572,20 @@ float fallSpeed = 1;
 tuple<aiVector3D*, aiVector3D*, aiVector3D*> cameraTriangle;
 // 让镜头下掉至地面上
 void fallCamera() {
-	float altitude = calculateAltitude(cameraTriangle);
+	float a, b, c, d;
+	calculatePlane(cameraTriangle, a, b, c, d);
+	float altitude = calculateAltitude(a, b, c, d);
 //	printf("altitude: %.2f\n", altitude);
+	if (isinf(altitude)) return;
+
 	float newY = std::max(cameraPos.y - fallSpeed, altitude + cameraHeight);
 	if (cameraPos.y != newY) {
+		//printf("newY: %.2f\n", newY);
+		//if (isinf(newY)) {
+			//printf("inf: %.2f %.2f %.2f %.2f %.lf\n", cameraPos.y, fallSpeed, altitude, cameraHeight, epsilon<float>());
+		//}
 		cameraPos.y = newY;
-		lookAt(cameraPos, cameraTarget, cameraUp);
+		lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
 		glutPostRedisplay();
 	}
 }
@@ -560,12 +597,14 @@ tuple<aiVector3D*, aiVector3D*, aiVector3D*> getCameraTriangle() {
 		aiMesh *ground = grounds[i];
 		for (unsigned j = 0; j < ground->mNumFaces; ++j) {
 			aiFace &face = ground->mFaces[j];
-			tuple<aiVector3D*, aiVector3D*, aiVector3D*> newT = make_tuple(nullptr, nullptr, nullptr);
-			get<0>(newT) = &ground->mVertices[face.mIndices[0]];
-			get<1>(newT) = &ground->mVertices[face.mIndices[1]];
-			get<2>(newT) = &ground->mVertices[face.mIndices[2]];
-			if (belowCamera(*get<0>(newT), *get<1>(newT), *get<2>(newT))) {
-				float newAltitude = calculateAltitude(newT);
+			tuple<aiVector3D*, aiVector3D*, aiVector3D*> newT = make_tuple(
+				&ground->mVertices[face.mIndices[0]],
+				&ground->mVertices[face.mIndices[1]],
+				&ground->mVertices[face.mIndices[2]]);
+			if (inTriangleProjectY(*get<0>(newT), *get<1>(newT), *get<2>(newT), cameraPos)) {
+				float a, b, c, d;
+				calculatePlane(newT, a, b, c, d);
+				float newAltitude = calculateAltitude(a, b, c, d);
 				if (altitude < newAltitude) {
 					t = newT;
 					altitude = newAltitude;
@@ -582,11 +621,32 @@ tuple<aiVector3D*, aiVector3D*, aiVector3D*> getCameraTriangle() {
 	return t;
 }
 
+bool collided(const vec3 &start, const vec3 &end) {
+	for (vector<aiMesh*>::iterator i = obstacles.begin(), oEnd = obstacles.end(); i < oEnd; ++i) {
+		aiMesh *obstacle = *i;
+		for (unsigned j = 0; j < obstacle->mNumFaces; ++j) {
+			aiFace &face = obstacle->mFaces[j];
+			tuple<aiVector3D*, aiVector3D*, aiVector3D*> t = make_tuple(
+				&obstacle->mVertices[face.mIndices[0]],
+				&obstacle->mVertices[face.mIndices[1]],
+				&obstacle->mVertices[face.mIndices[2]]);
+
+			float a, b, c, d;
+			calculatePlane(t, a, b, c, d);
+			vec3 p = calculateLinePlaneIntersection(start, end, a, b, c, d);
+			if (inTriangleProjectY(*get<0>(t), *get<1>(t), *get<2>(t), p)) return true;
+		}
+	}
+	return false;
+}
+
 void My_Timer(int val)
 {
 	++time;
-	cameraTriangle = getCameraTriangle();
-	if (get<0>(cameraTriangle)) fallCamera();
+	if (CAMERA_TYPE2) {
+		cameraTriangle = getCameraTriangle();
+		if (get<0>(cameraTriangle)) fallCamera();
+	}
 	glutPostRedisplay();
 	glutTimerFunc(timer_speed, My_Timer, val);
 }
@@ -625,8 +685,8 @@ void traceMouse(int x, int y)
 		float dx = x - oldX, dy = y - oldY;
 		if (CAMERA_TYPE2) dy *= FPS_CAMERA_VERTICAL_ROTATION_RATE; // 垂直镜头旋转幅度小一点
 
-		vec3 cameraFront = cameraTarget - cameraPos;
-		vec3 up = vec3(0, 1, 0);
+		vec3 up = CAMERA_TYPE2 ? vec3(0, 1, 0) : cameraUp;
+
 		mat4 rotation = rotate(mat4(), (float)deg2rad(length(vec2(dx, dy))) * speed,
 			normalize(up) * dx + normalize(cross(cameraFront, up)) * dy);
 
@@ -639,12 +699,13 @@ void traceMouse(int x, int y)
 		//	printf("angle: %.2f\n", angle);
 
 		//} else {
-			cameraTarget = mat3(rotation) * cameraTarget;
+			//cameraTarget = mat3(rotation) * cameraTarget;
+			cameraFront = mat3(rotation) * cameraFront;
 		//}
 		cameraUp = mat3(rotation) * cameraUp;
 
 
-		view = lookAt(cameraPos, cameraTarget, cameraUp);
+		view = lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
 
 		oldX = x;
 		oldY = y;
@@ -652,7 +713,7 @@ void traceMouse(int x, int y)
 		glutPostRedisplay();
 
 		printf("cameraPos:	(%.2f, %.2f, %.2f)\n", cameraPos.x, cameraPos.y, cameraPos.z);
-		printf("cameraFront:	(%.2f, %.2f, %.2f)\n", cameraTarget.x, cameraTarget.y, cameraTarget.z);
+		printf("cameraFront:	(%.2f, %.2f, %.2f)\n", cameraFront.x, cameraFront.y, cameraFront.z);
 		printf("cameraUp:	(%.2f, %.2f, %.2f)\n", cameraUp.x, cameraUp.y, cameraUp.z);
 	}
 }
@@ -661,22 +722,21 @@ void My_Mouse(int button, int state, int x, int y)
 {
 	if(state == GLUT_DOWN)
 	{
-		printf("Mouse %d is pressed at (%d, %d)\n", button, x, y);
+//		printf("Mouse %d is pressed at (%d, %d)\n", button, x, y);
 		oldX = x;
 		oldY = y;
 	}
 	else if(state == GLUT_UP)
 	{
-		printf("Mouse %d is released at (%d, %d)\n", button, x, y);
+//		printf("Mouse %d is released at (%d, %d)\n", button, x, y);
 	}
 }
 
 void My_Keyboard(unsigned char key, int x, int y)
 {
-	printf("Key %c is pressed at (%d, %d)\n", key, x, y);
+//	printf("Key %c is pressed at (%d, %d)\n", key, x, y);
 	vec3 dPos = vec3(0);
 	bool moving = true;
-	vec3 cameraFront = cameraTarget - cameraPos;
 	if (CAMERA_TYPE2) {
 		switch (key)
 		{
@@ -727,12 +787,15 @@ void My_Keyboard(unsigned char key, int x, int y)
 
 	if (!moving) return;
 
+	//if (collided(cameraPos, cameraPos + dPos)) {
+	//	printf("collided\n");
+	//	return;
+	//}
+
 	cameraPos += dPos;
-	cameraTarget += dPos;
-	//cameraUp += dPos;
-	view = lookAt(cameraPos, cameraTarget, cameraUp);
+	view = lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
 	printf("cameraPos:		(%.2f, %.2f, %.2f)\n", cameraPos.x, cameraPos.y, cameraPos.z);
-	printf("cameraFront:	(%.2f, %.2f, %.2f)\n", cameraTarget.x, cameraTarget.y, cameraTarget.z);
+	printf("cameraFront:	(%.2f, %.2f, %.2f)\n", cameraFront.x, cameraFront.y, cameraFront.z);
 	printf("cameraUp:		(%.2f, %.2f, %.2f)\n", cameraUp.x, cameraUp.y, cameraUp.z);
 }
 
