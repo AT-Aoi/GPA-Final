@@ -52,6 +52,10 @@ void testFunc() {
 	lightPos = vec3(test.x * 50, test.y * 50, 50);
 }
 
+/*skybox*/
+out vec3 _vertex;
+/*skybox*/
+
 void main()
 {
 	testFunc();
@@ -59,4 +63,6 @@ void main()
 	lighting();
 	makeFog();
 	gl_Position = um4p * um4mv * vec4(iv3vertex, 1.0);
+	/*skybox*/
+	_vertex = iv3vertex;
 }

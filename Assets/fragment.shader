@@ -55,6 +55,12 @@ vec3 makeFog(vec3 color) {
 
 ///====================Fog====================
 
+/* skybox */
+uniform samplerCube skybox;
+uniform int state;
+in vec3 _vertex;
+/* skybox */
+
 void testFunc() {
 	if (test.x == 0 && test.y == 0) return;
 
@@ -66,10 +72,15 @@ void main()
 {
 	testFunc();
 
-	vec3 color = texture(tex, vertexData.texcoord).rgb;
-	if (color == vec3(0)) discard;
-	color = lighting(color);
-	color = makeFog(color);
+	if (state == 0) {
+		vec3 color = texture(tex, vertexData.texcoord).rgb;
+		if (color == vec3(0)) discard;
+		color = lighting(color);
+		color = makeFog(color);
 
-	fragColor = vec4(color, 1.0);
+		fragColor = vec4(color, 1.0);
+	}
+	else if (state == 1) {
+		fragColor = texture(skybox, _vertex);
+	}
 }
