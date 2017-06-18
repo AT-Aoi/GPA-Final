@@ -223,7 +223,7 @@ GLuint loadCubemap(vector<const GLchar*> faces)
 {
 	GLuint textureID;
 	glGenTextures(1, &textureID);
-	glActiveTexture(GL_TEXTURE0);
+	glActiveTexture(GL_TEXTURE1);
 
 	int width, height;
 	unsigned char* image;
@@ -373,6 +373,7 @@ void useProgram(GLuint program) {
 void render() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	useProgram(program);
+
 	//change state
 	glUniform1i(state_location, 0);
 	//
@@ -387,11 +388,12 @@ void render() {
 		glBindTexture(GL_TEXTURE_2D, materials[materialID].diffuse_tex);
 		glDrawElements(GL_TRIANGLES, shapes[i].drawCount, GL_UNSIGNED_INT, 0);
 	}
+
 	/* render skybox */
 	glUniform1i(state_location, 1);
 	mat4 Identity(1.0);
-	mat4 S = scale(Identity, vec3(100000.0f, 100000.0f, 100000.0f));
-	glUniformMatrix4fv(mv_location, 1, GL_FALSE, &S[0][0]);
+	mat4 S = scale(Identity, vec3(500.0f, 500.0f, 500.0f));
+	glUniformMatrix4fv(mv_location, 1, GL_FALSE, (const GLfloat*)&(view * S));
 
 	glDepthMask(GL_FALSE);
 
