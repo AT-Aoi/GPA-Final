@@ -31,6 +31,9 @@ using namespace std;
 #define SCENE_PATH "./tmp3/"
 #define SCENE_FILE "tmp3.obj"
 
+vec3 lightPos[] = { vec3(-57.48, 26.90, 200.64) };
+GLuint lightPos_location;
+
 // Skybox setting 
 GLuint cubemapTexture;
 GLuint state_location;
@@ -492,6 +495,9 @@ void initShader() {
 	state_location = glGetUniformLocation(program, "state");
 	setSkybox();
 	//skybox
+	lightPos_location = glGetUniformLocation(program, "lightPos");
+	printf("sizeof: %d\n", sizeof(lightPos) / sizeof(vec3));
+	glUniform3fv(lightPos_location, sizeof(lightPos) / sizeof(vec3), (GLfloat*)lightPos);
 
 	program2 = createProgram(DEFAULT_SHADER);
 
@@ -667,8 +673,8 @@ float calculateAltitude(float a, float b, float c, float d) {
 	return -(a * cameraPos.x + c * cameraPos.z + d) / b;
 }
 
-vec3 calculateLinePlaneIntersection(const vec3 &v1, const vec3 &v2, float a, float b, float c, float d) {
-	vec3 v;
+// 返回 true 表示交点在线段内，false 表示不在
+bool calculateSegmentPlaneIntersection(const vec3 &v1, const vec3 &v2, float a, float b, float c, float d, vec3& v) {
 	float dx = v1.x - v2.x, dy = v1.y - v2.y, dz = v1.z - v2.z;
 	float detD = determinant(mat4(
 		a, b, c, 0,
@@ -682,13 +688,10 @@ vec3 calculateLinePlaneIntersection(const vec3 &v1, const vec3 &v2, float a, flo
 		0, 1, 0, v1.y,
 		0, 0, 1, v1.z
 	));
-	float t = detDt / (detD + epsilon<float>());
+	float t = detDt / detD;
+	v = vec3(v1.x - dx * t, v1.y - dy * t, v1.z - dz * t);
 
-	return vec3(
-		v1.x - dx * t,
-		v1.y - dy * t,
-		v1.z - dz * t
-	);
+	return 0 < t && t <= 1;
 }
 
 float cameraHeight = 2;
@@ -746,8 +749,10 @@ tuple<aiVector3D*, aiVector3D*, aiVector3D*> getCameraTriangle() {
 }
 
 bool collided(const vec3 &start, const vec3 &end) {
+	long numFaces = 0;
 	for (vector<aiMesh*>::iterator i = obstacles.begin(), oEnd = obstacles.end(); i < oEnd; ++i) {
 		aiMesh *obstacle = *i;
+		numFaces += obstacle->mNumFaces;
 		for (unsigned j = 0; j < obstacle->mNumFaces; ++j) {
 			aiFace &face = obstacle->mFaces[j];
 			tuple<aiVector3D*, aiVector3D*, aiVector3D*> t = make_tuple(
@@ -757,10 +762,12 @@ bool collided(const vec3 &start, const vec3 &end) {
 
 			float a, b, c, d;
 			calculatePlane(t, a, b, c, d);
-			vec3 p = calculateLinePlaneIntersection(start, end, a, b, c, d);
+			vec3 p;
+			if (!calculateSegmentPlaneIntersection(start, end, a, b, c, d, p)) continue;
 			if (inTriangleProjectY(*get<0>(t), *get<1>(t), *get<2>(t), p)) return true;
 		}
 	}
+	printf("numFaces: %ld\n", numFaces);
 	return false;
 }
 
@@ -970,7 +977,7 @@ int main(int argc, char *argv[])
 #else
     glutInitDisplayMode(GLUT_3_2_CORE_PROFILE | GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
 #endif
-	glutInitWindowPosition(100, 100);
+	glutInitWindowPosition(500, 100);
 	glutInitWindowSize(600, 600);
 	glutCreateWindow("X1057117_AS3"); // You cannot use OpenGL functions before this line; The OpenGL context must be created first by glutCreateWindow()!
 #ifdef _MSC_VER

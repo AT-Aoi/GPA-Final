@@ -4,9 +4,12 @@ layout(location = 0) in vec3 iv3vertex;
 layout(location = 1) in vec2 iv2tex_coord;
 layout(location = 2) in vec3 iv3normal;
 
+#define LIGHT_NUM 1
+
 uniform mat4 um4mv;
 uniform mat4 um4p;
 uniform vec2 test;
+uniform vec3 lightPos[LIGHT_NUM];
 
 ///====================Lighting====================
 
@@ -15,19 +18,15 @@ out VertexData
 	vec3 N; // eye space normal
 	vec3 L; // eye space light vector
 	vec3 H; // eye space halfway vector
-	vec2 texcoord;
-} vertexData;
+} vertexData[LIGHT_NUM];
+out vec2 texcoord;
 
-vec3 lightPos = vec3(-30, 60, 80);
-
-void lighting() {
+void lighting(int i) {
 	vec4 P = um4mv * vec4(iv3vertex, 1);
-	vertexData.texcoord = iv2tex_coord;
 
-	vec3 V = -P.xyz;
-	vertexData.N = mat3(um4mv) * iv3normal;
-	vertexData.L = lightPos - P.xyz;
-	vertexData.H = vertexData.L + V;
+	vertexData[i].N = mat3(um4mv) * iv3normal;
+	vertexData[i].L = (um4mv * vec4(lightPos[0], 1)).xyz - P.xyz;
+	vertexData[i].H = vertexData[i].L + -P.xyz;
 }
 
 ///====================Lighting====================
@@ -43,13 +42,9 @@ void makeFog() {
 ///====================Fog====================
 
 void testFunc() {
-	if (test.x == 0 && test.y == 0) {
-		//		test.x = 0.5;
-		//		test.y = 0.5;
-		return;
-	}
+	if (test.x == 0 && test.y == 0) return;
 
-	lightPos = vec3(test.x * 50, test.y * 50, 50);
+	
 }
 
 /*skybox*/
@@ -60,9 +55,14 @@ void main()
 {
 	testFunc();
 
-	lighting();
+	texcoord = iv2tex_coord;
+
+	for (int i = 0; i < LIGHT_NUM; ++i) {
+		lighting(0);
+	}
 	makeFog();
 	gl_Position = um4p * um4mv * vec4(iv3vertex, 1.0);
+
 	/*skybox*/
 	_vertex = iv3vertex;
 }

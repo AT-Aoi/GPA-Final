@@ -2,6 +2,8 @@
 
 layout(location = 0) out vec4 fragColor;
 
+#define LIGHT_NUM 1
+
 uniform sampler2D tex;
 uniform mat4 um4mv;
 uniform mat4 um4p;
@@ -12,30 +14,55 @@ uniform vec2 test;
 in VertexData
 {
 	vec3 N; // eye space normal
-vec3 L; // eye space light vector
-vec3 H; // eye space halfway vector
-vec2 texcoord;
-} vertexData;
+	vec3 L; // eye space light vector
+	vec3 H; // eye space halfway vector
+} vertexData[LIGHT_NUM];
+in vec2 texcoord;
 
-vec3 Ks = vec3(1, 1, 1);
-vec3 Ia = vec3(0.3, 0.3, 0.3);
-vec3 Id = vec3(0.5, 0.5, 0.5);
-vec3 Is = vec3(1, 1, 1) * 0.515;
-float shiness = 4.43;
+vec3 Ks = vec3(1);
+vec3 Ia = vec3(0.2);
+vec3 Id = vec3(4); // 0.5
+vec3 Is = vec3(0.112); // * 0.515;
+float shiness = 0.177 * 5; // 4.43
+float c1 = 0.9;
+float c2 = 0.225;
+float c3 = 0.022;
+float c4 = -0.0001;
 
-vec3 lighting(vec3 color) {
-	vec3 N = normalize(vertexData.N);
-	vec3 L = normalize(vertexData.L);
-	vec3 H = normalize(vertexData.H);
+vec3 directionalLighting(vec3 color, int i) {
+	vec3 N = normalize(vertexData[i].N);
+	vec3 L = normalize(vertexData[i].L);
+	vec3 H = normalize(vertexData[i].H);
 
+	float dist = length(vertexData[i].L);
 	float theta = max(dot(N, L), 0);
 	float phi = max(dot(N, H), 0);
+	float fa = min(1 / (c1 + c2 * dist + c3 * dist * dist), 1);
+	//float fa = exp(c4 * dist * dist * dist);
 
 	vec3 ambient = color * Ia;
 	vec3 diffuse = color * Id * theta;
 	vec3 specular = Ks * Is * pow(phi, shiness);
 
-	return ambient + diffuse + specular;
+	return ambient + fa * (diffuse + specular);
+}
+
+vec3 pointLighting(vec3 color, int i) {
+	vec3 N = normalize(vertexData[i].N);
+	vec3 L = normalize(vertexData[i].L);
+	vec3 H = normalize(vertexData[i].H);
+
+	float dist = length(vertexData[i].L);
+	float theta = max(dot(N, L), 0);
+	float phi = max(dot(N, H), 0);
+	float fa = min(1 / (c1 + c2 * dist + c3 * dist * dist), 1);
+	//float fa = exp(c4 * dist * dist * dist);
+
+	vec3 ambient = color * Ia;
+	vec3 diffuse = color * Id * theta;
+	vec3 specular = Ks * Is * pow(phi, shiness);
+
+	return ambient + fa * (diffuse + specular);
 }
 
 ///====================Lighting====================
@@ -64,8 +91,11 @@ in vec3 _vertex;
 void testFunc() {
 	if (test.x == 0 && test.y == 0) return;
 
-	//shiness = test.x * 10;
-	//Is = vec3(1, 1, 1) * test.y;
+//	Is = vec3(1) * test.x;
+//	shiness = 5 * test.y;
+//	c2 = test.x;
+//	c3 = test.y;
+//	c4 = -0.0001 * test.x;
 }
 
 void main()
@@ -73,10 +103,13 @@ void main()
 	testFunc();
 
 	if (state == 0) {
-		vec3 color = texture(tex, vertexData.texcoord).rgb;
+		vec3 color = texture(tex, texcoord).rgb;
 		if (color == vec3(0)) discard;
-		color = lighting(color);
-		color = makeFog(color);
+
+		for (int i = 0; i < LIGHT_NUM; ++i) {
+			color = pointLighting(color, i);
+		}
+		//color = makeFog(color);
 
 		fragColor = vec4(color, 1.0);
 	}
