@@ -2,7 +2,8 @@
 
 layout(location = 0) out vec4 fragColor;
 
-#define LIGHT_NUM 1
+//*改这个点光源个数
+#define LIGHT_NUM 3
 
 uniform sampler2D tex;
 uniform mat4 um4mv;
@@ -13,9 +14,10 @@ in vec2 texcoord;
 
 ///====================Lighting====================
 
+//*平行光（太阳光）的参数，调得有夜晚感觉一点
 vec3 directionalKs = vec3(1);
 vec3 directionalIa = vec3(0.1);
-vec3 directionalId = vec3(0.3);
+vec3 directionalId = vec3(0.2);
 vec3 directionalIs = vec3(0.515);
 float directionalShiness = 4.43;
 
@@ -41,8 +43,9 @@ vec3 directionalLighting(in vec3 color) {
 	return ambient + diffuse + specular;
 }
 
+//*点光源的参数，调得有灯光感觉一点
 vec3 pointKs = vec3(1);
-vec3 pointIa = vec3(0.2);
+vec3 pointIa = vec3(0.1);
 vec3 pointId = vec3(4); // 0.5
 vec3 pointIs = vec3(0.112); // * 0.515;
 float pointShiness = 0.177 * 5; // 4.43
@@ -60,15 +63,17 @@ in PointLight
 } pointLight[LIGHT_NUM];
 
 vec3 pointLighting(in vec3 color, in int i) {
+	float dist = length(pointLight[i].L);
+
+	if (20 < dist) return vec3(0); // too far, no effect
+
 	vec3 N = normalize(pointLight[i].N);
 	vec3 L = normalize(pointLight[i].L);
 	vec3 H = normalize(pointLight[i].H);
 
-	float dist = length(pointLight[i].L);
 	float theta = max(dot(N, L), 0);
 	float phi = max(dot(N, H), 0);
 	float fa = min(1 / (c1 + c2 * dist + c3 * dist * dist), 1);
-	//float fa = exp(c4 * dist * dist * dist);
 
 	vec3 ambient = color * pointIa;
 	vec3 diffuse = color * pointId * theta;
@@ -123,7 +128,7 @@ void main()
 			color += pointLighting(textureColor, i);
 		}
 
-		//color = makeFog(color);
+		color = makeFog(color);
 
 		fragColor = vec4(color, 1.0);
 	}

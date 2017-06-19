@@ -4,7 +4,8 @@ layout(location = 0) in vec3 iv3vertex;
 layout(location = 1) in vec2 iv2tex_coord;
 layout(location = 2) in vec3 iv3normal;
 
-#define LIGHT_NUM 1
+//*改这个点光源个数
+#define LIGHT_NUM 3
 
 uniform mat4 um4mv;
 uniform mat4 um4p;
@@ -28,6 +29,7 @@ out DirectionalLight{
 	vec3 H; // eye space halfway vector
 } directionalLight;
 
+//*太阳位置，弄个好位置
 vec3 sun = vec3(-57.48, 200, 200.64);
 
 void directionalLighting() {
