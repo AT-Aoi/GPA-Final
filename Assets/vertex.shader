@@ -11,22 +11,39 @@ uniform mat4 um4p;
 uniform vec2 test;
 uniform vec3 lightPos[LIGHT_NUM];
 
+out vec2 texcoord;
+
 ///====================Lighting====================
 
-out VertexData
+out PointLight
 {
 	vec3 N; // eye space normal
 	vec3 L; // eye space light vector
 	vec3 H; // eye space halfway vector
-} vertexData[LIGHT_NUM];
-out vec2 texcoord;
+} pointLight[LIGHT_NUM];
 
-void lighting(int i) {
+out DirectionalLight{
+	vec3 N; // eye space normal
+	vec3 L; // eye space light vector
+	vec3 H; // eye space halfway vector
+} directionalLight;
+
+vec3 sun = vec3(-57.48, 200, 200.64);
+
+void directionalLighting() {
 	vec4 P = um4mv * vec4(iv3vertex, 1);
 
-	vertexData[i].N = mat3(um4mv) * iv3normal;
-	vertexData[i].L = (um4mv * vec4(lightPos[0], 1)).xyz - P.xyz;
-	vertexData[i].H = vertexData[i].L + -P.xyz;
+	directionalLight.N = mat3(um4mv) * iv3normal;
+	directionalLight.L = (um4mv * vec4(sun, 1)).xyz - P.xyz;
+	directionalLight.H = directionalLight.L + -P.xyz;
+}
+
+void pointLighting(in int i) {
+	vec4 P = um4mv * vec4(iv3vertex, 1);
+
+	pointLight[i].N = mat3(um4mv) * iv3normal;
+	pointLight[i].L = (um4mv * vec4(lightPos[i], 1)).xyz - P.xyz;
+	pointLight[i].H = pointLight[i].L + -P.xyz;
 }
 
 ///====================Lighting====================
@@ -57,8 +74,9 @@ void main()
 
 	texcoord = iv2tex_coord;
 
+	directionalLighting();
 	for (int i = 0; i < LIGHT_NUM; ++i) {
-		lighting(0);
+		pointLighting(i);
 	}
 	makeFog();
 	gl_Position = um4p * um4mv * vec4(iv3vertex, 1.0);
